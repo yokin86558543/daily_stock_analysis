@@ -17,7 +17,11 @@ on:
           - full          # 完整分析（股票+大盘）
           - market-only   # 仅大盘复盘
           - stocks-only   # 仅股票分析
-
+      force_run:
+        description: '强制运行（忽略交易日检查）'
+        required: false
+        default: false
+        type: boolean
 # 并发控制：同一时间只运行一个分析任务
 concurrency:
   group: stock-analysis
@@ -50,7 +54,8 @@ jobs:
       - name: 创建必要目录
         run: |
           mkdir -p data logs reports
-      
+          
+              
       - name: 执行股票分析
         env:
           # ==========================================
@@ -165,6 +170,13 @@ jobs:
         run: |
           # 判断运行模式
           MODE="${{ github.event.inputs.mode || 'full' }}"
+           # 获取强制运行参数 (如果是 true，则添加 --force-run)
+          if ${{ github.event.inputs.force_run }}; then
+            FORCE_PARAM="--force-run"
+            echo "⚡ 强制运行已启用: $FORCE_PARAM"
+          else
+            FORCE_PARAM=""
+          fi
           
           echo "=========================================="
           echo "🚀 A股自选股智能分析系统"
@@ -197,14 +209,19 @@ jobs:
           echo "=========================================="
           echo ""
           
-          # 执行分析
+          # 👇 构建最终命令：将 $FORCE_PARAM 加入命令
+          CMD="python main.py $FORCE_PARAM"
+          # 根据 MODE 添加其他参数
           if [ "$MODE" = "market-only" ]; then
-            python main.py --market-review
+            CMD="$CMD --market-review"
           elif [ "$MODE" = "stocks-only" ]; then
-            python main.py --no-market-review
-          else
-            python main.py
+            CMD="$CMD --no-market-review"
           fi
+          
+          # 执行最终拼接好的命令
+          echo "🚀 执行命令: $CMD"
+          eval $CMD         
+         
       
       - name: 上传分析报告
         uses: actions/upload-artifact@v4
